@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# One line per agent session, those waiting on you first (README, "The record").
+# Read-only: records whose pid is dead are skipped, not deleted.
+set -euo pipefail
+dir="${AGENT_STATUS_DIR:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/agent-status}/sessions"
+[ -d "$dir" ] || exit 0
+
+for f in "$dir"/*.json; do
+  [ -e "$f" ] || continue
+  rec=$(jq -ce 'select(.state and .since)' "$f" 2>/dev/null) || continue
+  pid=$(jq -r '.pid // empty' <<<"$rec")
+  if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then continue; fi
+  echo "$rec"
+done | jq -rs --argjson now "$(date +%s)" '
+  def rank: {"input-required": 0, "completed": 1}[.state] // 2;
+  def age: ($now - (.since | fromdateiso8601)) as $s
+    | if $s < 60 then "\($s)s" elif $s < 3600 then "\($s / 60 | floor)m"
+      elif $s < 86400 then "\($s / 3600 | floor)h" else "\($s / 86400 | floor)d" end;
+  if length == 0 then empty else
+    ["STATE", "FOR", "PROJECT", "SESSION", "HARNESS", "REASON"],
+    (sort_by([rank, .since])[] | [.state, age, (.project | split("/") | last), .session[:8], .harness, .reason // ""])
+    | @tsv
+  end' | column -t -s $'\t'
