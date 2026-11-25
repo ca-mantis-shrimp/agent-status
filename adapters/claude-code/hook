@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Claude Code hook: turns each hook event into this session's record (README, "The record").
+# Wire it to SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PermissionRequest,
+# Notification, Stop and SessionEnd. It never fails the harness: errors go to errors.log.
+set -euo pipefail
+root="${AGENT_STATUS_DIR:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/agent-status}"
+dir="$root/sessions"
+mkdir -p "$dir"
+exec 2>>"$root/errors.log"
+trap 'echo "$(date -u +%FT%TZ) claude-code hook failed at line $LINENO" >>"$root/errors.log"; exit 0' ERR
+
+input=$(cat)
+field() { jq -r --arg k "$1" '.[$k] // empty' <<<"$input"; }
+
+# The claude process that ran this hook; the hook's direct parent is usually a shell.
+claude_pid() {
+  local p=$PPID
+  while [ "${p:-0}" -gt 1 ]; do
+    [ "$(cat "/proc/$p/comm" 2>/dev/null)" = claude ] && { echo "$p"; return; }
+    p=$(ps -o ppid= -p "$p" | tr -d ' ')
+  done
+}
+
+session=$(field session_id)
+[ -n "$session" ] || exit 0
+file="$dir/claude-code-$session.json"
+
+state='' reason=''
+case "$(field hook_event_name)" in
+  SessionStart | Stop) state=completed ;;
+  UserPromptSubmit | PostToolUse) state=working ;;
+  PreToolUse)
+    case "$(field tool_name)" in
+      AskUserQuestion | ExitPlanMode) state=input-required reason=question ;;
+      *) state=working ;;
+    esac ;;
+  PermissionRequest) state=input-required reason="permission: $(field tool_name)" ;;
+  Notification)
+    case "$(field notification_type)" in
+      permission_prompt | elicitation_dialog | elicitation_url_dialog | agent_needs_input)
+        state=input-required reason=$(field message) ;;
+      *) exit 0 ;;
+    esac ;;
+  SessionEnd) rm -f "$file"; exit 0 ;;
+  *) exit 0 ;;
+esac
+
+# Same state as before: keep its since and first reason.
+[ -f "$file" ] && [ "$(jq -r .state "$file" 2>/dev/null)" = "$state" ] && exit 0
+
+tmp=$(mktemp "$dir/.claude-code-XXXXXX")
+jq -n --arg session "$session" --arg project "${CLAUDE_PROJECT_DIR:-$(field cwd)}" \
+  --arg state "$state" --arg since "$(date -u +%FT%TZ)" --arg reason "$reason" --arg pid "$(claude_pid)" \
+  '{harness: "claude-code", $session, $project, $state, $since}
+   + (if $reason != "" then {$reason} else {} end)
+   + (if $pid != "" then {pid: ($pid | tonumber)} else {} end)' >"$tmp"
+mv "$tmp" "$file"
