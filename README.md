@@ -41,6 +41,7 @@ Rules:
 ## Adapters
 
 - [`adapters/claude-code`](adapters/claude-code): Claude Code hooks.
+- [`adapters/pi`](adapters/pi): a pi extension; link it into `~/.pi/agent/extensions`.
 
 ## Readers
 
