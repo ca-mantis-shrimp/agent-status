@@ -17,7 +17,7 @@ done | jq -rs --argjson now "$(date +%s)" '
     | if $s < 60 then "\($s)s" elif $s < 3600 then "\($s / 60 | floor)m"
       elif $s < 86400 then "\($s / 3600 | floor)h" else "\($s / 86400 | floor)d" end;
   if length == 0 then empty else
-    ["STATE", "FOR", "PROJECT", "SESSION", "HARNESS", "REASON"],
-    (sort_by([rank, .since])[] | [.state, age, (.project | split("/") | last), .session[:8], .harness, .reason // ""])
+    ["STATE", "FOR", "NAME", "SESSION", "HARNESS", "REASON"],
+    (sort_by([rank, .since])[] | [.state, age, (.name // (.project | split("/") | last)), .session[:8], .harness, .reason // ""])
     | @tsv
   end' | column -t -s $'\t'

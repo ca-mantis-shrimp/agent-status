@@ -16,6 +16,11 @@ send PostToolUse --arg tool_name AskUserQuestion;    eq "$(state)" working "an a
 send PermissionRequest --arg tool_name Bash;         eq "$(jq -r .reason "$rec")" "permission: Bash" "permission reason"
 send Notification --arg notification_type idle_prompt; eq "$(state)" input-required "idle notices change nothing"
 send Stop;                                           eq "$(state)" completed "a finished turn waits for you"
+t=$AGENT_STATUS_DIR/transcript.jsonl
+echo '{"type":"ai-title","aiTitle":"Fix the parser"}' >"$t"
+send UserPromptSubmit --arg transcript_path "$t";    eq "$(jq -r .name "$rec")" "Fix the parser" "the harness's title names it"
+echo '{"type":"agent-name","agentName":"focus"}' >>"$t"; echo '{"type":"ai-title","aiTitle":"Later title"}' >>"$t"
+send Stop --arg transcript_path "$t";                eq "$(jq -r .name "$rec")" focus "a name you set beats the title"
 send SessionEnd;                                     [ ! -e "$rec" ] || fail "an ended session leaves no record"
 
 echo 'not json' | $hook || fail "bad input must not fail the harness"

@@ -12,6 +12,15 @@ trap 'echo "$(date -u +%FT%TZ) claude-code hook failed at line $LINENO" >>"$root
 input=$(cat)
 field() { jq -r --arg k "$1" '.[$k] // empty' <<<"$input"; }
 
+# The session's name: one you set (claude -n), else the title Claude Code gave it. Both live in the
+# transcript, whose format is Claude Code's own and undocumented; if it changes, the name is just absent.
+session_name() {
+  local t; t=$(field transcript_path)
+  [ -r "$t" ] || return 0
+  grep -hE '"type":"(agent-name|ai-title)"' "$t" | jq -rs '
+    (map(select(.type == "agent-name")) | last | .agentName) // (map(select(.type == "ai-title")) | last | .aiTitle) // empty'
+}
+
 # The claude process that ran this hook; the hook's direct parent is usually a shell.
 claude_pid() {
   local p=$PPID
@@ -51,7 +60,9 @@ esac
 tmp=$(mktemp "$dir/.claude-code-XXXXXX")
 jq -n --arg session "$session" --arg project "${CLAUDE_PROJECT_DIR:-$(field cwd)}" \
   --arg state "$state" --arg since "$(date -u +%FT%TZ)" --arg reason "$reason" --arg pid "$(claude_pid)" \
+  --arg name "$(session_name)" \
   '{harness: "claude-code", $session, $project, $state, $since}
+   + (if $name != "" then {$name} else {} end)
    + (if $reason != "" then {$reason} else {} end)
    + (if $pid != "" then {pid: ($pid | tonumber)} else {} end)' >"$tmp"
 mv "$tmp" "$file"

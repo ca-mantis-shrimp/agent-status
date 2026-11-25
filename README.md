@@ -18,6 +18,7 @@ One JSON file per session:
 | `project` | yes      | absolute path of the session's working directory                       |
 | `state`   | yes      | one of the states below                                                 |
 | `since`   | yes      | when the state began, RFC 3339 in UTC                                   |
+| `name`    | no       | what the session is called: one you set, else one the harness gave it    |
 | `reason`  | no       | short human-readable detail, e.g. which tool wants permission           |
 | `pid`     | no       | the harness process; readers drop the record once it is dead            |
 

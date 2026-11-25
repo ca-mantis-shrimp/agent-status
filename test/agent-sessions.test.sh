@@ -12,6 +12,10 @@ out=$(bin/agent-sessions)
 eq "$(awk 'NR > 1 {print $3}' <<<"$out" | paste -sd,)" beta,gamma,alpha "waiting first, then working"
 grep -q delta <<<"$out" && fail "a dead pid is skipped"
 grep -q 'permission: Bash' <<<"$out" || fail "reason is shown"
+put --arg session named000 --arg project /p/epsilon --arg name "Fix the parser" --arg state working --arg since 2026-11-25T03:00:00Z
+out=$(bin/agent-sessions)
+grep -q 'Fix the parser' <<<"$out" || fail "a name replaces the directory"
+grep -q epsilon <<<"$out" && fail "the directory is only the fallback"
 
 rm "$AGENT_STATUS_DIR"/sessions/*
 eq "$(bin/agent-sessions)" "" "no sessions prints nothing"
