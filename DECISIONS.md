@@ -15,3 +15,9 @@ its layout. We share its format only if that ever makes sense.
 
 A2A is a network protocol between remote agents and doesn't cover watching a local session, but its task states are
 the nearest standard vocabulary. Using its names costs nothing and keeps a later bridge simple.
+
+## 4. Readers show, they don't interrupt (2026-11-25, Darrion)
+
+A session waiting on you shows quietly in a reader; no reader sends a notification, bell or sound, not even for
+`input-required`. Engaging with a session is a decision you make by looking, and toggling a view is enough. Be
+disciplined about notifications.
